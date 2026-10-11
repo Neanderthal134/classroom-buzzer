@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EdUHK Smart Buzzer</title>
-    <!-- PeerJS for connection -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <!-- QR Code Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         :root {
@@ -18,7 +16,7 @@
         }
 
         body {
-            font-family: 'Comic Sans MS', 'Arial', sans-serif;
+            font-family: 'Comic Sans MS', 'Arial', 'Microsoft JhengHei', sans-serif;
             background-color: var(--bg);
             margin: 0;
             display: flex;
@@ -69,13 +67,9 @@
         th, td { padding: 12px; border-bottom: 2px solid #eee; }
         .rank-1 { background: #fff3b0 !important; font-weight: bold; }
 
-        #qrcode {
-            display: flex;
-            justify-content: center;
-            margin: 20px 0;
-        }
-
+        #qrcode { display: flex; justify-content: center; margin: 20px 0; }
         #countdown { font-size: 6rem; color: var(--accent); margin: 20px 0; }
+        
         .big-buzzer {
             width: 200px;
             height: 200px;
@@ -97,7 +91,7 @@
 
         <!-- STEP 1: SELECT ROLE -->
         <div id="setup-view">
-            <p>Select your role to start:</p>
+            <p>Select your role:</p>
             <button class="btn btn-blue" onclick="showTeacherSetup()">I am the Teacher</button>
             <button class="btn btn-green" onclick="showStudentJoin()">I am a Student</button>
         </div>
@@ -105,10 +99,11 @@
         <!-- TEACHER SETUP -->
         <div id="teacher-setup-view" class="hidden">
             <h3>Create a Room</h3>
-            <input type="text" id="custom-room-id" placeholder="Room Name (e.g. MATH1)">
+            <p><small>Can be Chinese, spaces, or symbols!</small></p>
+            <input type="text" id="custom-room-id" placeholder="e.g. 中文 101">
             <button class="btn btn-blue" onclick="initTeacher()">Start Room</button>
             <div id="qrcode-container">
-                <p><small>Students scan this to join:</small></p>
+                <p><small>Students scan this to open the site:</small></p>
                 <div id="qrcode"></div>
             </div>
         </div>
@@ -121,7 +116,7 @@
             <p>Students Connected: <span id="student-count">0</span></p>
             <button class="btn btn-red" onclick="triggerCountdown()">START ROUND</button>
             
-            <table>
+            <table id="leaderboard-table">
                 <thead>
                     <tr><th>Student</th><th>Time (s)</th></tr>
                 </thead>
@@ -133,7 +128,7 @@
         <!-- STUDENT JOIN INTERFACE -->
         <div id="student-join-view" class="hidden">
             <input type="text" id="student-name" placeholder="Your Name">
-            <input type="text" id="room-id-input" placeholder="Room ID from Teacher">
+            <input type="text" id="room-id-input" placeholder="Room ID (Chinese OK!)">
             <button class="btn btn-green" onclick="initStudent()">Join Game</button>
         </div>
 
@@ -147,7 +142,6 @@
         </div>
     </div>
 
-    <!-- SOUNDS -->
     <audio id="snd-tick" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
     <audio id="snd-go" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg"></audio>
 
@@ -158,23 +152,27 @@
         let startTime = 0;
         let results = [];
 
-        // Generate QR Code for students to access this specific website
+        // --- THE SECRET CONVERTER ---
+        // This turns Chinese/Spaces into a safe code for the computer
+        function makeSafeId(input) {
+            // We encode the string and remove characters PeerJS doesn't like (+, /, =)
+            return "room_" + btoa(unescape(encodeURIComponent(input.trim())))
+                .replace(/\+/g, 'x').replace(/\//g, 'y').replace(/=/g, 'z');
+        }
+
         function generateQR() {
-            const currentURL = window.location.href;
             new QRCode(document.getElementById("qrcode"), {
-                text: currentURL,
-                width: 128,
-                height: 128
+                text: window.location.href,
+                width: 128, height: 128
             });
         }
 
         function playSound(id) {
             const s = document.getElementById(id);
             s.currentTime = 0;
-            s.play().catch(e => console.log("Sound blocked"));
+            s.play().catch(e => {});
         }
 
-        // --- TEACHER LOGIC ---
         function showTeacherSetup() {
             document.getElementById('setup-view').classList.add('hidden');
             document.getElementById('teacher-setup-view').classList.remove('hidden');
@@ -182,30 +180,29 @@
         }
 
         function initTeacher() {
-            const customId = document.getElementById('custom-room-id').value.trim();
-            if(!customId) return alert("Please enter a Room ID");
+            const rawId = document.getElementById('custom-room-id').value;
+            if(!rawId) return alert("Please type a Room ID");
+            
+            const safeId = makeSafeId(rawId);
 
-            peer = new Peer(customId); 
+            peer = new Peer(safeId); 
 
             peer.on('open', (id) => {
                 document.getElementById('teacher-setup-view').classList.add('hidden');
                 document.getElementById('teacher-view').classList.remove('hidden');
-                document.getElementById('room-id-display').innerText = id;
+                document.getElementById('room-id-display').innerText = rawId; // Show the pretty Chinese name
             });
 
             peer.on('error', (err) => {
-                if(err.type === 'unavailable-id') {
-                    alert("This Room ID is already taken. Try adding a number to it!");
-                }
+                if(err.type === 'unavailable-id') alert("Room name taken, try another!");
+                else alert("Error: " + err.type);
             });
 
             peer.on('connection', (c) => {
                 c.on('open', () => {
                     connections.push(c);
                     document.getElementById('student-count').innerText = connections.length;
-                    c.on('data', (data) => {
-                        if(data.type === 'BUZZ') handleBuzz(data);
-                    });
+                    c.on('data', (data) => { if(data.type === 'BUZZ') handleBuzz(data); });
                 });
             });
         }
@@ -235,23 +232,25 @@
 
         function initStudent() {
             const name = document.getElementById('student-name').value;
-            const roomId = document.getElementById('room-id-input').value.trim();
-            if (!name || !roomId) return alert("Enter name and Room ID");
+            const rawRoom = document.getElementById('room-id-input').value;
+            if (!name || !rawRoom) return alert("Enter name and Room ID");
 
+            const safeRoom = makeSafeId(rawRoom);
             document.getElementById('display-name').innerText = "Student: " + name;
-            peer = new Peer(); 
             
+            peer = new Peer(); 
             peer.on('open', () => {
-                conn = peer.connect(roomId);
+                conn = peer.connect(safeRoom);
                 conn.on('open', () => {
                     document.getElementById('student-join-view').classList.add('hidden');
                     document.getElementById('student-game-view').classList.remove('hidden');
                 });
-                
-                // Set up data listener
                 conn.on('data', (data) => {
                     if (data.type === 'START_COUNTDOWN') startStudentCountdown();
                 });
+                setTimeout(() => {
+                    if(!conn.open) alert("Could not find that room! Check the spelling.");
+                }, 3000);
             });
         }
 
