@@ -71,16 +71,13 @@
         #countdown { font-size: 6rem; color: var(--accent); margin: 20px 0; }
         
         .big-buzzer {
-            width: 200px;
-            height: 200px;
+            width: 200px; height: 200px;
             border-radius: 50%;
             background: radial-gradient(circle, #ff6b6b, #d33682);
-            color: white;
-            font-size: 2rem;
+            color: white; font-size: 2rem;
             border: 8px solid #a02862;
             box-shadow: 0 10px 0 #801f4e;
-            cursor: pointer;
-            margin: 0 auto;
+            cursor: pointer; margin: 0 auto;
         }
     </style>
 </head>
@@ -89,7 +86,6 @@
     <div class="card">
         <h1>🔔 Classroom Buzzer</h1>
 
-        <!-- STEP 1: SELECT ROLE -->
         <div id="setup-view">
             <p>Select your role:</p>
             <button class="btn btn-blue" onclick="showTeacherSetup()">I am the Teacher</button>
@@ -99,11 +95,11 @@
         <!-- TEACHER SETUP -->
         <div id="teacher-setup-view" class="hidden">
             <h3>Create a Room</h3>
-            <p><small>Can be Chinese, spaces, or symbols!</small></p>
-            <input type="text" id="custom-room-id" placeholder="e.g. 中文 101">
+            <p><small>Quotes " " and 中文 are now supported!</small></p>
+            <input type="text" id="custom-room-id" placeholder='e.g. "中文" 老師'>
             <button class="btn btn-blue" onclick="initTeacher()">Start Room</button>
             <div id="qrcode-container">
-                <p><small>Students scan this to open the site:</small></p>
+                <p><small>Scan to join:</small></p>
                 <div id="qrcode"></div>
             </div>
         </div>
@@ -115,24 +111,20 @@
             </div>
             <p>Students Connected: <span id="student-count">0</span></p>
             <button class="btn btn-red" onclick="triggerCountdown()">START ROUND</button>
-            
-            <table id="leaderboard-table">
-                <thead>
-                    <tr><th>Student</th><th>Time (s)</th></tr>
-                </thead>
+            <table>
+                <thead><tr><th>Student</th><th>Time (s)</th></tr></thead>
                 <tbody id="leaderboard"></tbody>
             </table>
             <button onclick="location.reload()" style="margin-top:20px; color: grey; border:none; background:none; cursor:pointer;">Reset Room</button>
         </div>
 
-        <!-- STUDENT JOIN INTERFACE -->
+        <!-- STUDENT JOIN -->
         <div id="student-join-view" class="hidden">
             <input type="text" id="student-name" placeholder="Your Name">
-            <input type="text" id="room-id-input" placeholder="Room ID (Chinese OK!)">
+            <input type="text" id="room-id-input" placeholder='Room ID (e.g. "中文")'>
             <button class="btn btn-green" onclick="initStudent()">Join Game</button>
         </div>
 
-        <!-- STUDENT GAME INTERFACE -->
         <div id="student-game-view" class="hidden">
             <h3 id="display-name"></h3>
             <div id="waiting-msg">Waiting for teacher to start...</div>
@@ -142,22 +134,20 @@
         </div>
     </div>
 
+    <!-- SOUNDS -->
     <audio id="snd-tick" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
     <audio id="snd-go" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg"></audio>
 
     <script>
-        let peer = null;
-        let conn = null; 
-        let connections = []; 
-        let startTime = 0;
-        let results = [];
+        let peer = null, conn = null, connections = [], startTime = 0, results = [];
 
-        // --- THE SECRET CONVERTER ---
-        // This turns Chinese/Spaces into a safe code for the computer
+        // THE BULLETPROOF CONVERTER
+        // Converts every char to its Hex code (e.g., "A" becomes "0041")
+        // Safe for PeerJS because it only contains 0-9 and a-f
         function makeSafeId(input) {
-            // We encode the string and remove characters PeerJS doesn't like (+, /, =)
-            return "room_" + btoa(unescape(encodeURIComponent(input.trim())))
-                .replace(/\+/g, 'x').replace(/\//g, 'y').replace(/=/g, 'z');
+            return "room_" + Array.from(input.trim()).map(c => 
+                c.charCodeAt(0).toString(16).padStart(4, '0')
+            ).join('');
         }
 
         function generateQR() {
@@ -173,6 +163,7 @@
             s.play().catch(e => {});
         }
 
+        // TEACHER
         function showTeacherSetup() {
             document.getElementById('setup-view').classList.add('hidden');
             document.getElementById('teacher-setup-view').classList.remove('hidden');
@@ -182,22 +173,18 @@
         function initTeacher() {
             const rawId = document.getElementById('custom-room-id').value;
             if(!rawId) return alert("Please type a Room ID");
-            
             const safeId = makeSafeId(rawId);
 
             peer = new Peer(safeId); 
-
             peer.on('open', (id) => {
                 document.getElementById('teacher-setup-view').classList.add('hidden');
                 document.getElementById('teacher-view').classList.remove('hidden');
-                document.getElementById('room-id-display').innerText = rawId; // Show the pretty Chinese name
+                document.getElementById('room-id-display').innerText = rawId;
             });
-
             peer.on('error', (err) => {
-                if(err.type === 'unavailable-id') alert("Room name taken, try another!");
-                else alert("Error: " + err.type);
+                if(err.type === 'unavailable-id') alert("Room name is in use!");
+                else alert("Connection Error: " + err.type);
             });
-
             peer.on('connection', (c) => {
                 c.on('open', () => {
                     connections.push(c);
@@ -219,12 +206,11 @@
             const board = document.getElementById('leaderboard');
             board.innerHTML = "";
             results.forEach((r, idx) => {
-                const row = `<tr class="${idx === 0 ? 'rank-1' : ''}"><td>${r.name}</td><td>${r.time}s</td></tr>`;
-                board.innerHTML += row;
+                board.innerHTML += `<tr class="${idx === 0 ? 'rank-1' : ''}"><td>${r.name}</td><td>${r.time}s</td></tr>`;
             });
         }
 
-        // --- STUDENT LOGIC ---
+        // STUDENT
         function showStudentJoin() {
             document.getElementById('setup-view').classList.add('hidden');
             document.getElementById('student-join-view').classList.remove('hidden');
@@ -245,23 +231,19 @@
                     document.getElementById('student-join-view').classList.add('hidden');
                     document.getElementById('student-game-view').classList.remove('hidden');
                 });
+                // Crucial: Student listening for Teacher
                 conn.on('data', (data) => {
                     if (data.type === 'START_COUNTDOWN') startStudentCountdown();
                 });
-                setTimeout(() => {
-                    if(!conn.open) alert("Could not find that room! Check the spelling.");
-                }, 3000);
             });
+            
+            setTimeout(() => { if(!conn || !conn.open) alert("Check Room ID spelling!"); }, 4000);
         }
 
         function startStudentCountdown() {
-            const countEl = document.getElementById('countdown');
-            const waitMsg = document.getElementById('waiting-msg');
-            const btn = document.getElementById('buzzer-btn');
-            const resMsg = document.getElementById('result-msg');
-
-            resMsg.innerText = "";
-            waitMsg.classList.add('hidden');
+            const countEl = document.getElementById('countdown'), btn = document.getElementById('buzzer-btn');
+            document.getElementById('waiting-msg').classList.add('hidden');
+            document.getElementById('result-msg').innerText = "";
             countEl.classList.remove('hidden');
             btn.classList.add('hidden');
 
@@ -289,12 +271,7 @@
             document.getElementById('buzzer-btn').classList.add('hidden');
             document.getElementById('countdown').classList.add('hidden');
             document.getElementById('result-msg').innerText = "Sent! Time: " + reactionTime + "s";
-            
-            conn.send({
-                type: 'BUZZ',
-                name: document.getElementById('student-name').value,
-                time: reactionTime
-            });
+            conn.send({ type: 'BUZZ', name: document.getElementById('student-name').value, time: reactionTime });
         }
     </script>
 </body>
