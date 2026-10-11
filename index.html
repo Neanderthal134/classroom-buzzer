@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EdUHK Smart Buzzer</title>
+    <title>Classroom Buzzer</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
@@ -95,11 +95,11 @@
         <!-- TEACHER SETUP -->
         <div id="teacher-setup-view" class="hidden">
             <h3>Create a Room</h3>
-            <p><small>Quotes " " and 中文 are now supported!</small></p>
-            <input type="text" id="custom-room-id" placeholder='e.g. "中文" 老師'>
+            <p><small>Type a Room Name for your students:</small></p>
+            <input type="text" id="custom-room-id" placeholder='e.g. MATH 101'>
             <button class="btn btn-blue" onclick="initTeacher()">Start Room</button>
             <div id="qrcode-container">
-                <p><small>Scan to join:</small></p>
+                <p><small>Students scan to join:</small></p>
                 <div id="qrcode"></div>
             </div>
         </div>
@@ -121,7 +121,7 @@
         <!-- STUDENT JOIN -->
         <div id="student-join-view" class="hidden">
             <input type="text" id="student-name" placeholder="Your Name">
-            <input type="text" id="room-id-input" placeholder='Room ID (e.g. "中文")'>
+            <input type="text" id="room-id-input" placeholder='Room ID from Teacher'>
             <button class="btn btn-green" onclick="initStudent()">Join Game</button>
         </div>
 
@@ -141,9 +141,6 @@
     <script>
         let peer = null, conn = null, connections = [], startTime = 0, results = [];
 
-        // THE BULLETPROOF CONVERTER
-        // Converts every char to its Hex code (e.g., "A" becomes "0041")
-        // Safe for PeerJS because it only contains 0-9 and a-f
         function makeSafeId(input) {
             return "room_" + Array.from(input.trim()).map(c => 
                 c.charCodeAt(0).toString(16).padStart(4, '0')
@@ -163,7 +160,6 @@
             s.play().catch(e => {});
         }
 
-        // TEACHER
         function showTeacherSetup() {
             document.getElementById('setup-view').classList.add('hidden');
             document.getElementById('teacher-setup-view').classList.remove('hidden');
@@ -183,7 +179,6 @@
             });
             peer.on('error', (err) => {
                 if(err.type === 'unavailable-id') alert("Room name is in use!");
-                else alert("Connection Error: " + err.type);
             });
             peer.on('connection', (c) => {
                 c.on('open', () => {
@@ -210,7 +205,6 @@
             });
         }
 
-        // STUDENT
         function showStudentJoin() {
             document.getElementById('setup-view').classList.add('hidden');
             document.getElementById('student-join-view').classList.remove('hidden');
@@ -231,13 +225,11 @@
                     document.getElementById('student-join-view').classList.add('hidden');
                     document.getElementById('student-game-view').classList.remove('hidden');
                 });
-                // Crucial: Student listening for Teacher
                 conn.on('data', (data) => {
                     if (data.type === 'START_COUNTDOWN') startStudentCountdown();
                 });
             });
-            
-            setTimeout(() => { if(!conn || !conn.open) alert("Check Room ID spelling!"); }, 4000);
+            setTimeout(() => { if(!conn || !conn.open) alert("Room not found!"); }, 4000);
         }
 
         function startStudentCountdown() {
@@ -246,11 +238,9 @@
             document.getElementById('result-msg').innerText = "";
             countEl.classList.remove('hidden');
             btn.classList.add('hidden');
-
             let timeLeft = 3;
             countEl.innerText = timeLeft;
             playSound('snd-tick');
-
             const timer = setInterval(() => {
                 timeLeft--;
                 if (timeLeft > 0) {
