@@ -14,55 +14,32 @@
             --accent: #d33682;
             --white: #ffffff;
         }
-
         body {
             font-family: 'Comic Sans MS', 'Arial', 'Microsoft JhengHei', sans-serif;
             background-color: var(--bg);
-            margin: 0;
-            display: flex;
-            justify-content: center;
-            padding: 20px;
+            margin: 0; display: flex; justify-content: center; padding: 20px;
         }
-
         .card {
-            background: var(--white);
-            padding: 25px;
-            border-radius: 25px;
-            box-shadow: 0 10px 0 #eee;
-            width: 100%;
-            max-width: 450px;
-            text-align: center;
-            border: 4px solid #333;
+            background: var(--white); padding: 25px; border-radius: 25px;
+            box-shadow: 0 10px 0 #eee; width: 100%; max-width: 450px;
+            text-align: center; border: 4px solid #333;
         }
-
-        h1 { color: #333; font-size: 1.8rem; }
+        h1 { color: #333; font-size: 1.8rem; margin-bottom: 10px; }
         .hidden { display: none; }
-
         .btn {
-            padding: 15px 30px;
-            border: none;
-            border-radius: 15px;
-            font-weight: bold;
-            font-size: 1.1rem;
-            cursor: pointer;
-            margin: 10px;
-            transition: transform 0.1s;
+            padding: 15px 30px; border: none; border-radius: 15px;
+            font-weight: bold; font-size: 1.1rem; cursor: pointer;
+            margin: 10px; transition: transform 0.1s;
         }
         .btn:active { transform: scale(0.95); }
         .btn-blue { background: var(--teacher-primary); color: white; }
         .btn-green { background: var(--student-primary); color: white; }
         .btn-red { background: var(--accent); color: white; width: 100%; font-size: 1.5rem; }
-
+        
         input {
-            padding: 12px;
-            width: 80%;
-            border: 2px solid #ddd;
-            border-radius: 10px;
-            margin-bottom: 15px;
-            font-size: 1rem;
-            text-align: center;
+            padding: 12px; width: 85%; border: 2px solid #ddd;
+            border-radius: 10px; margin-bottom: 15px; font-size: 1rem; text-align: center;
         }
-
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { padding: 12px; border-bottom: 2px solid #eee; }
         .rank-1 { background: #fff3b0 !important; font-weight: bold; }
@@ -71,14 +48,12 @@
         #countdown { font-size: 6rem; color: var(--accent); margin: 20px 0; }
         
         .big-buzzer {
-            width: 200px; height: 200px;
-            border-radius: 50%;
+            width: 200px; height: 200px; border-radius: 50%;
             background: radial-gradient(circle, #ff6b6b, #d33682);
-            color: white; font-size: 2rem;
-            border: 8px solid #a02862;
-            box-shadow: 0 10px 0 #801f4e;
-            cursor: pointer; margin: 0 auto;
+            color: white; font-size: 2rem; border: 8px solid #a02862;
+            box-shadow: 0 10px 0 #801f4e; cursor: pointer; margin: 0 auto;
         }
+        .status-msg { color: #268bd2; font-weight: bold; margin: 10px; }
     </style>
 </head>
 <body>
@@ -86,6 +61,7 @@
     <div class="card">
         <h1>🔔 Classroom Buzzer</h1>
 
+        <!-- SELECTION -->
         <div id="setup-view">
             <p>Select your role:</p>
             <button class="btn btn-blue" onclick="showTeacherSetup()">I am the Teacher</button>
@@ -95,9 +71,8 @@
         <!-- TEACHER SETUP -->
         <div id="teacher-setup-view" class="hidden">
             <h3>Create a Room</h3>
-            <p><small>Type a Room Name for your students:</small></p>
-            <input type="text" id="custom-room-id" placeholder='e.g. MATH 101'>
-            <button class="btn btn-blue" onclick="initTeacher()">Start Room</button>
+            <input type="text" id="custom-room-id" placeholder='e.g. 中文 101'>
+            <button class="btn btn-blue" id="start-btn" onclick="initTeacher()">Start Room</button>
             <div id="qrcode-container">
                 <p><small>Students scan to join:</small></p>
                 <div id="qrcode"></div>
@@ -110,31 +85,33 @@
                 <strong>ROOM ID:</strong> <span id="room-id-display" style="font-size: 1.5rem; color: #d33682;">...</span>
             </div>
             <p>Students Connected: <span id="student-count">0</span></p>
-            <button class="btn btn-red" onclick="triggerCountdown()">START ROUND</button>
+            <button class="btn btn-red" id="master-start-btn" onclick="triggerCountdown()">START ROUND</button>
+            
             <table>
                 <thead><tr><th>Student</th><th>Time (s)</th></tr></thead>
                 <tbody id="leaderboard"></tbody>
             </table>
-            <button onclick="location.reload()" style="margin-top:20px; color: grey; border:none; background:none; cursor:pointer;">Reset Room</button>
+            <button onclick="location.reload()" style="margin-top:30px; color: #999; border:none; background:none; cursor:pointer; font-size: 0.8rem;">Close Room & Disconnect All</button>
         </div>
 
         <!-- STUDENT JOIN -->
         <div id="student-join-view" class="hidden">
             <input type="text" id="student-name" placeholder="Your Name">
-            <input type="text" id="room-id-input" placeholder='Room ID from Teacher'>
-            <button class="btn btn-green" onclick="initStudent()">Join Game</button>
+            <input type="text" id="room-id-input" placeholder='Room ID (e.g. 中文 101)'>
+            <div id="student-status" class="status-msg"></div>
+            <button class="btn btn-green" id="join-btn" onclick="initStudent()">Join Game</button>
         </div>
 
+        <!-- STUDENT GAME -->
         <div id="student-game-view" class="hidden">
             <h3 id="display-name"></h3>
             <div id="waiting-msg">Waiting for teacher to start...</div>
             <div id="countdown" class="hidden"></div>
             <button id="buzzer-btn" class="big-buzzer hidden" onclick="buzz()">BUZZ!</button>
-            <div id="result-msg" style="font-size: 1.2rem; margin-top: 20px;"></div>
+            <div id="result-msg" style="font-size: 1.2rem; margin-top: 20px; font-weight: bold; color: var(--accent);"></div>
         </div>
     </div>
 
-    <!-- SOUNDS -->
     <audio id="snd-tick" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
     <audio id="snd-go" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg"></audio>
 
@@ -142,15 +119,17 @@
         let peer = null, conn = null, connections = [], startTime = 0, results = [];
 
         function makeSafeId(input) {
-            return "room_" + Array.from(input.trim()).map(c => 
+            const clean = input.trim().toLowerCase();
+            return "room_" + Array.from(clean).map(c => 
                 c.charCodeAt(0).toString(16).padStart(4, '0')
             ).join('');
         }
 
         function generateQR() {
+            document.getElementById("qrcode").innerHTML = "";
             new QRCode(document.getElementById("qrcode"), {
                 text: window.location.href,
-                width: 128, height: 128
+                width: 150, height: 150
             });
         }
 
@@ -160,6 +139,7 @@
             s.play().catch(e => {});
         }
 
+        // TEACHER LOGIC
         function showTeacherSetup() {
             document.getElementById('setup-view').classList.add('hidden');
             document.getElementById('teacher-setup-view').classList.remove('hidden');
@@ -170,15 +150,17 @@
             const rawId = document.getElementById('custom-room-id').value;
             if(!rawId) return alert("Please type a Room ID");
             const safeId = makeSafeId(rawId);
-
+            document.getElementById('start-btn').innerText = "Opening Room...";
+            
             peer = new Peer(safeId); 
-            peer.on('open', (id) => {
+            peer.on('open', () => {
                 document.getElementById('teacher-setup-view').classList.add('hidden');
                 document.getElementById('teacher-view').classList.remove('hidden');
                 document.getElementById('room-id-display').innerText = rawId;
             });
             peer.on('error', (err) => {
-                if(err.type === 'unavailable-id') alert("Room name is in use!");
+                alert("Error: Room name might be taken or connection failed.");
+                location.reload();
             });
             peer.on('connection', (c) => {
                 c.on('open', () => {
@@ -190,12 +172,24 @@
         }
 
         function triggerCountdown() {
-            results = [];
-            document.getElementById('leaderboard').innerHTML = "";
+            results = []; // Clear results array
+            document.getElementById('leaderboard').innerHTML = ""; // Clear table UI
+            document.getElementById('master-start-btn').innerText = "ROUND IN PROGRESS...";
+            document.getElementById('master-start-btn').disabled = true;
+            
             connections.forEach(c => c.send({ type: 'START_COUNTDOWN' }));
+            
+            // Re-enable the button after the countdown (approx 4 seconds)
+            setTimeout(() => {
+                document.getElementById('master-start-btn').innerText = "START NEXT ROUND";
+                document.getElementById('master-start-btn').disabled = false;
+            }, 4000);
         }
 
         function handleBuzz(data) {
+            // Check if this student already buzzed this round to prevent double-entries
+            if (results.find(r => r.name === data.name)) return;
+
             results.push(data);
             results.sort((a, b) => a.time - b.time);
             const board = document.getElementById('leaderboard');
@@ -205,6 +199,7 @@
             });
         }
 
+        // STUDENT LOGIC
         function showStudentJoin() {
             document.getElementById('setup-view').classList.add('hidden');
             document.getElementById('student-join-view').classList.remove('hidden');
@@ -213,15 +208,18 @@
         function initStudent() {
             const name = document.getElementById('student-name').value;
             const rawRoom = document.getElementById('room-id-input').value;
-            if (!name || !rawRoom) return alert("Enter name and Room ID");
-
-            const safeRoom = makeSafeId(rawRoom);
-            document.getElementById('display-name').innerText = "Student: " + name;
+            const status = document.getElementById('student-status');
             
+            if (!name || !rawRoom) return alert("Enter name and Room ID");
+            const safeRoom = makeSafeId(rawRoom);
+            status.innerText = "Connecting...";
+            document.getElementById('join-btn').disabled = true;
+
             peer = new Peer(); 
             peer.on('open', () => {
                 conn = peer.connect(safeRoom);
                 conn.on('open', () => {
+                    document.getElementById('display-name').innerText = "Student: " + name;
                     document.getElementById('student-join-view').classList.add('hidden');
                     document.getElementById('student-game-view').classList.remove('hidden');
                 });
@@ -229,18 +227,30 @@
                     if (data.type === 'START_COUNTDOWN') startStudentCountdown();
                 });
             });
-            setTimeout(() => { if(!conn || !conn.open) alert("Room not found!"); }, 4000);
+            setTimeout(() => {
+                if(!conn || !conn.open) {
+                    status.innerText = "❌ Room Not Found.";
+                    document.getElementById('join-btn').disabled = false;
+                }
+            }, 5000);
         }
 
         function startStudentCountdown() {
-            const countEl = document.getElementById('countdown'), btn = document.getElementById('buzzer-btn');
-            document.getElementById('waiting-msg').classList.add('hidden');
-            document.getElementById('result-msg').innerText = "";
+            const countEl = document.getElementById('countdown');
+            const btn = document.getElementById('buzzer-btn');
+            const waitMsg = document.getElementById('waiting-msg');
+            const resMsg = document.getElementById('result-msg');
+
+            // Reset UI for the new round
+            resMsg.innerText = "";
+            waitMsg.classList.add('hidden');
             countEl.classList.remove('hidden');
             btn.classList.add('hidden');
+
             let timeLeft = 3;
             countEl.innerText = timeLeft;
             playSound('snd-tick');
+
             const timer = setInterval(() => {
                 timeLeft--;
                 if (timeLeft > 0) {
@@ -260,8 +270,13 @@
             const reactionTime = ((Date.now() - startTime) / 1000).toFixed(3);
             document.getElementById('buzzer-btn').classList.add('hidden');
             document.getElementById('countdown').classList.add('hidden');
-            document.getElementById('result-msg').innerText = "Sent! Time: " + reactionTime + "s";
-            conn.send({ type: 'BUZZ', name: document.getElementById('student-name').value, time: reactionTime });
+            document.getElementById('result-msg').innerText = "SENT! Time: " + reactionTime + "s";
+            
+            conn.send({ 
+                type: 'BUZZ', 
+                name: document.getElementById('student-name').value, 
+                time: reactionTime 
+            });
         }
     </script>
 </body>
