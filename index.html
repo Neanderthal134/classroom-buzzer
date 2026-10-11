@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EdUHK Smart Buzzer</title>
+    <!-- PeerJS for connection -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- QR Code Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root {
+            --bg: #fdf6e3;
+            --teacher-primary: #268bd2;
+            --student-primary: #859900;
+            --accent: #d33682;
+            --white: #ffffff;
+        }
+
+        body {
+            font-family: 'Comic Sans MS', 'Arial', sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .card {
+            background: var(--white);
+            padding: 25px;
+            border-radius: 25px;
+            box-shadow: 0 10px 0 #eee;
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+            border: 4px solid #333;
+        }
+
+        h1 { color: #333; font-size: 1.8rem; }
+        .hidden { display: none; }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 15px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            cursor: pointer;
+            margin: 10px;
+            transition: transform 0.1s;
+        }
+        .btn:active { transform: scale(0.95); }
+        .btn-blue { background: var(--teacher-primary); color: white; }
+        .btn-green { background: var(--student-primary); color: white; }
+        .btn-red { background: var(--accent); color: white; width: 100%; font-size: 1.5rem; }
+
+        input {
+            padding: 12px;
+            width: 80%;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 1rem;
+            text-align: center;
+        }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; border-bottom: 2px solid #eee; }
+        .rank-1 { background: #fff3b0 !important; font-weight: bold; }
+
+        #qrcode {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        #countdown { font-size: 6rem; color: var(--accent); margin: 20px 0; }
+        .big-buzzer {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #ff6b6b, #d33682);
+            color: white;
+            font-size: 2rem;
+            border: 8px solid #a02862;
+            box-shadow: 0 10px 0 #801f4e;
+            cursor: pointer;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1>🔔 Classroom Buzzer</h1>
+
+        <!-- STEP 1: SELECT ROLE -->
+        <div id="setup-view">
+            <p>Select your role to start:</p>
+            <button class="btn btn-blue" onclick="showTeacherSetup()">I am the Teacher</button>
+            <button class="btn btn-green" onclick="showStudentJoin()">I am a Student</button>
+        </div>
+
+        <!-- TEACHER SETUP -->
+        <div id="teacher-setup-view" class="hidden">
+            <h3>Create a Room</h3>
+            <input type="text" id="custom-room-id" placeholder="Room Name (e.g. MATH1)">
+            <button class="btn btn-blue" onclick="initTeacher()">Start Room</button>
+            <div id="qrcode-container">
+                <p><small>Students scan this to join:</small></p>
+                <div id="qrcode"></div>
+            </div>
+        </div>
+
+        <!-- TEACHER DASHBOARD -->
+        <div id="teacher-view" class="hidden">
+            <div style="background: #e1f5fe; padding: 10px; border-radius: 10px; border: 2px dashed #268bd2;">
+                <strong>ROOM ID:</strong> <span id="room-id-display" style="font-size: 1.5rem; color: #d33682;">...</span>
+            </div>
+            <p>Students Connected: <span id="student-count">0</span></p>
+            <button class="btn btn-red" onclick="triggerCountdown()">START ROUND</button>
+            
+            <table>
+                <thead>
+                    <tr><th>Student</th><th>Time (s)</th></tr>
+                </thead>
+                <tbody id="leaderboard"></tbody>
+            </table>
+            <button onclick="location.reload()" style="margin-top:20px; color: grey; border:none; background:none; cursor:pointer;">Reset Room</button>
+        </div>
+
+        <!-- STUDENT JOIN INTERFACE -->
+        <div id="student-join-view" class="hidden">
+            <input type="text" id="student-name" placeholder="Your Name">
+            <input type="text" id="room-id-input" placeholder="Room ID from Teacher">
+            <button class="btn btn-green" onclick="initStudent()">Join Game</button>
+        </div>
+
+        <!-- STUDENT GAME INTERFACE -->
+        <div id="student-game-view" class="hidden">
+            <h3 id="display-name"></h3>
+            <div id="waiting-msg">Waiting for teacher to start...</div>
+            <div id="countdown" class="hidden"></div>
+            <button id="buzzer-btn" class="big-buzzer hidden" onclick="buzz()">BUZZ!</button>
+            <div id="result-msg" style="font-size: 1.2rem; margin-top: 20px;"></div>
+        </div>
+    </div>
+
+    <!-- SOUNDS -->
+    <audio id="snd-tick" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+    <audio id="snd-go" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg"></audio>
+
+    <script>
+        let peer = null;
+        let conn = null; 
+        let connections = []; 
+        let startTime = 0;
+        let results = [];
+
+        // Generate QR Code for students to access this specific website
+        function generateQR() {
+            const currentURL = window.location.href;
+            new QRCode(document.getElementById("qrcode"), {
+                text: currentURL,
+                width: 128,
+                height: 128
+            });
+        }
+
+        function playSound(id) {
+            const s = document.getElementById(id);
+            s.currentTime = 0;
+            s.play().catch(e => console.log("Sound blocked"));
+        }
+
+        // --- TEACHER LOGIC ---
+        function showTeacherSetup() {
+            document.getElementById('setup-view').classList.add('hidden');
+            document.getElementById('teacher-setup-view').classList.remove('hidden');
+            generateQR();
+        }
+
+        function initTeacher() {
+            const customId = document.getElementById('custom-room-id').value.trim();
+            if(!customId) return alert("Please enter a Room ID");
+
+            peer = new Peer(customId); 
+
+            peer.on('open', (id) => {
+                document.getElementById('teacher-setup-view').classList.add('hidden');
+                document.getElementById('teacher-view').classList.remove('hidden');
+                document.getElementById('room-id-display').innerText = id;
+            });
+
+            peer.on('error', (err) => {
+                if(err.type === 'unavailable-id') {
+                    alert("This Room ID is already taken. Try adding a number to it!");
+                }
+            });
+
+            peer.on('connection', (c) => {
+                c.on('open', () => {
+                    connections.push(c);
+                    document.getElementById('student-count').innerText = connections.length;
+                    c.on('data', (data) => {
+                        if(data.type === 'BUZZ') handleBuzz(data);
+                    });
+                });
+            });
+        }
+
+        function triggerCountdown() {
+            results = [];
+            document.getElementById('leaderboard').innerHTML = "";
+            connections.forEach(c => c.send({ type: 'START_COUNTDOWN' }));
+        }
+
+        function handleBuzz(data) {
+            results.push(data);
+            results.sort((a, b) => a.time - b.time);
+            const board = document.getElementById('leaderboard');
+            board.innerHTML = "";
+            results.forEach((r, idx) => {
+                const row = `<tr class="${idx === 0 ? 'rank-1' : ''}"><td>${r.name}</td><td>${r.time}s</td></tr>`;
+                board.innerHTML += row;
+            });
+        }
+
+        // --- STUDENT LOGIC ---
+        function showStudentJoin() {
+            document.getElementById('setup-view').classList.add('hidden');
+            document.getElementById('student-join-view').classList.remove('hidden');
+        }
+
+        function initStudent() {
+            const name = document.getElementById('student-name').value;
+            const roomId = document.getElementById('room-id-input').value.trim();
+            if (!name || !roomId) return alert("Enter name and Room ID");
+
+            document.getElementById('display-name').innerText = "Student: " + name;
+            peer = new Peer(); 
+            
+            peer.on('open', () => {
+                conn = peer.connect(roomId);
+                conn.on('open', () => {
+                    document.getElementById('student-join-view').classList.add('hidden');
+                    document.getElementById('student-game-view').classList.remove('hidden');
+                });
+                
+                // Set up data listener
+                conn.on('data', (data) => {
+                    if (data.type === 'START_COUNTDOWN') startStudentCountdown();
+                });
+            });
+        }
+
+        function startStudentCountdown() {
+            const countEl = document.getElementById('countdown');
+            const waitMsg = document.getElementById('waiting-msg');
+            const btn = document.getElementById('buzzer-btn');
+            const resMsg = document.getElementById('result-msg');
+
+            resMsg.innerText = "";
+            waitMsg.classList.add('hidden');
+            countEl.classList.remove('hidden');
+            btn.classList.add('hidden');
+
+            let timeLeft = 3;
+            countEl.innerText = timeLeft;
+            playSound('snd-tick');
+
+            const timer = setInterval(() => {
+                timeLeft--;
+                if (timeLeft > 0) {
+                    countEl.innerText = timeLeft;
+                    playSound('snd-tick');
+                } else {
+                    clearInterval(timer);
+                    countEl.innerText = "GO!";
+                    playSound('snd-go');
+                    btn.classList.remove('hidden');
+                    startTime = Date.now();
+                }
+            }, 1000);
+        }
+
+        function buzz() {
+            const reactionTime = ((Date.now() - startTime) / 1000).toFixed(3);
+            document.getElementById('buzzer-btn').classList.add('hidden');
+            document.getElementById('countdown').classList.add('hidden');
+            document.getElementById('result-msg').innerText = "Sent! Time: " + reactionTime + "s";
+            
+            conn.send({
+                type: 'BUZZ',
+                name: document.getElementById('student-name').value,
+                time: reactionTime
+            });
+        }
+    </script>
+</body>
+</html>
